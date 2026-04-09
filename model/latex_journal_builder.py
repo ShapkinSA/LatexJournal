@@ -35,12 +35,14 @@ class LatexJournalBuilder:
         }
         self.page_style: str = "plain"
         self.background_image_path: str | None = None
+        self.page_margins: dict[str, str] | None = None
         self.fonts = {
             "body": {"size": self._format_font_size(10), "family": "\\rmfamily"},
             "article_title": {"size": self._format_font_size(16), "family": "\\rmfamily"},
             "issue_info": {"size": self._format_font_size(9), "family": "\\rmfamily"},
             "section_title": {"size": self._format_font_size(12), "family": "\\rmfamily"},
             "caption": {"size": self._format_font_size(9), "family": "\\rmfamily"},
+            "page_number": {"size": self._format_font_size(10), "family": "\\rmfamily"},
         }
         self._load_globals_from_template(template_path)
 
@@ -160,6 +162,25 @@ class LatexJournalBuilder:
         return width
 
     @staticmethod
+    def _validate_non_negative_dimension(value: str, name: str) -> str:
+        """
+        Accept LaTeX dimensions like '0', '1.5cm', '12pt', '3 mm'.
+        Negative values are forbidden.
+        """
+        cleaned = value.strip().replace(" ", "")
+        match = re.match(r"^(?P<num>[+-]?[0-9]*\.?[0-9]+)(?P<unit>cm|mm|in|pt|em|ex)?$", cleaned)
+        if not match:
+            raise ValueError(
+                f"Invalid {name} value '{value}'. Use non-negative size like '0', '1.5cm', '12pt'."
+            )
+        number = float(match.group("num"))
+        if number < 0:
+            raise ValueError(f"{name} cannot be negative: {value}")
+        # Bare numeric values are interpreted as centimeters.
+        unit = match.group("unit") or "cm"
+        return f"{number:g}{unit}"
+
+    @staticmethod
     def _escape_latex(text: str) -> str:
         text = LatexJournalBuilder._sanitize_text(text)
         replacements = {
@@ -206,6 +227,31 @@ class LatexJournalBuilder:
         self.lengths[name.strip().lstrip("\\")] = value.strip()
         return self
 
+    def set_page_margins(
+        self, top: str, right: str, bottom: str, left: str
+    ) -> "LatexJournalBuilder":
+        """
+        Set page margins explicitly.
+        Values should be LaTeX dimensions, e.g. '2cm', '15mm'.
+        """
+        top_v = self._validate_non_negative_dimension(top, "top")
+        right_v = self._validate_non_negative_dimension(right, "right")
+        bottom_v = self._validate_non_negative_dimension(bottom, "bottom")
+        left_v = self._validate_non_negative_dimension(left, "left")
+
+        # Keep explicit per-side values; applied via geometry package in _compose_tex.
+        self.page_margins = {
+            "top": top_v,
+            "right": right_v,
+            "bottom": bottom_v,
+            "left": left_v,
+        }
+        return self
+
+    def set_column_gap(self, value: str) -> "LatexJournalBuilder":
+        self.lengths["columnsep"] = value.strip()
+        return self
+
     def set_background_image(self, path_to_image: str) -> "LatexJournalBuilder":
         image_path = Path(path_to_image).resolve()
         if image_path.exists():
@@ -245,6 +291,15 @@ class LatexJournalBuilder:
 
     def set_caption_font(self, size: int | float, family: str) -> "LatexJournalBuilder":
         self.fonts["caption"] = {
+            "size": self._format_font_size(size),
+            "family": self._validate_font_family(family),
+        }
+        return self
+
+    def set_page_number_font(
+        self, size: int | float, family: str
+    ) -> "LatexJournalBuilder":
+        self.fonts["page_number"] = {
             "size": self._format_font_size(size),
             "family": self._validate_font_family(family),
         }
@@ -344,10 +399,31 @@ class LatexJournalBuilder:
     def _compose_tex(self) -> str:
         options_list = [opt for opt in self.document_options if opt != "twocolumn"]
         options = f"[{','.join(options_list)}]" if options_list else ""
-        packages = "\n".join(self.package_lines)
-        lengths = "\n".join(
-            f"\\setlength{{\\{name}}}{{{value}}}" for name, value in self.lengths.items()
-        )
+        package_lines = list(self.package_lines)
+        if self.page_margins and "\\usepackage{geometry}" not in package_lines:
+            package_lines.append("\\usepackage{geometry}")
+        packages = "\n".join(package_lines)
+
+        excluded_for_geometry = {"topmargin", "oddsidemargin", "evensidemargin", "textwidth", "textheight"}
+        lengths_lines = []
+        for name, value in self.lengths.items():
+            if self.page_margins and name in excluded_for_geometry:
+                continue
+            lengths_lines.append(f"\\setlength{{\\{name}}}{{{value}}}")
+        lengths = "\n".join(lengths_lines)
+
+        geometry_setup = ""
+        if self.page_margins:
+            geometry_setup = (
+                "\\geometry{"
+                f"top={self.page_margins['top']},"
+                f"right={self.page_margins['right']},"
+                f"bottom={self.page_margins['bottom']},"
+                f"left={self.page_margins['left']},"
+                "ignoreheadfoot,"
+                "nomarginpar"
+                "}\n"
+            )
         body_parts: List[str] = []
         in_multicols = False
         for block_type, content in self.blocks:
@@ -384,6 +460,7 @@ class LatexJournalBuilder:
             f"\\documentclass{options}{{{self.document_class}}}\n\n"
             f"{packages}\n\n"
             f"{background_setup}"
+            f"{geometry_setup}"
             f"{lengths}\n"
             f"\\pagestyle{{{self.page_style}}}\n\n"
             f"\\newcommand{{\\BodyTextFont}}{{{self.fonts['body']['size']} {self.fonts['body']['family']}}}\n"
@@ -391,6 +468,16 @@ class LatexJournalBuilder:
             f"\\newcommand{{\\IssueInfoFont}}{{{self.fonts['issue_info']['size']} {self.fonts['issue_info']['family']}}}\n"
             f"\\newcommand{{\\SectionTitleFont}}{{{self.fonts['section_title']['size']} {self.fonts['section_title']['family']}}}\n"
             f"\\newcommand{{\\CaptionFont}}{{{self.fonts['caption']['size']} {self.fonts['caption']['family']}}}\n\n"
+            f"\\newcommand{{\\PageNumberFont}}{{{self.fonts['page_number']['size']} {self.fonts['page_number']['family']}}}\n\n"
+            "\\makeatletter\n"
+            "\\def\\ps@plain{%\n"
+            "  \\let\\@mkboth\\@gobbletwo\n"
+            "  \\let\\@oddhead\\@empty\n"
+            "  \\let\\@evenhead\\@empty\n"
+            "  \\def\\@oddfoot{\\hfil{\\PageNumberFont\\thepage}\\hfil}\n"
+            "  \\let\\@evenfoot\\@oddfoot\n"
+            "}\n"
+            "\\makeatother\n\n"
             "\\newlength{\\JournalOneColWidth}\n"
             "\\setlength{\\JournalOneColWidth}{\\dimexpr(\\textwidth-\\columnsep)/2\\relax}\n\n"
             "\\begin{document}\n\n"

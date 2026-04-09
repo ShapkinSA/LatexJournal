@@ -13,6 +13,13 @@ if __name__ == "__main__":
         .set_issue_info_font(11, "roman")
         .set_section_title_font(12, "roman")
         .set_caption_font(10, "roman")
+
+
+        .set_page_number_font(10, "roman")
+        .set_page_margins("1", "1", "1.8", "1")
+        .set_column_gap("0.7cm")
+
+
     )
 
 
@@ -32,7 +39,7 @@ if __name__ == "__main__":
             Правило отбора в ряды фиолетовых плащей простое - жим от груди 100 кг и 100 дорожек в бассейне.
             """
         )
-        .add_picture("pictures/копейщики.png", "Элита городского гарнизона","1\\columnwidth")
+        .add_picture("pictures/копейщики.png", "Элита городского гарнизона","0.9\\columnwidth")
 
         .add_paragraph(
             """
@@ -41,7 +48,7 @@ if __name__ == "__main__":
             В центральном парке стоит памятник одной такой собаке.
             """
         )
-        .add_picture("pictures/гудак.png", "Статуя псу-атлету", "1\\columnwidth")
+        .add_picture("pictures/гудак.png", "Статуя псу-атлету", "0.9\\columnwidth")
 
         .add_paragraph(
             """
