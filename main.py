@@ -111,9 +111,8 @@ if __name__ == "__main__":
     )
 
 
-
-
-
+    #Добавляем фон
+    _builder.set_background_image("background/first-version.png")
 
     pdf_path = _builder.build_pdf("output/final_article.pdf")
     print(f"PDF generated: {pdf_path}")

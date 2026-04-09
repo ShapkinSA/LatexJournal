@@ -34,6 +34,7 @@ class LatexJournalBuilder:
             "floatsep": "0.3em",
         }
         self.page_style: str = "plain"
+        self.background_image_path: str | None = None
         self.fonts = {
             "body": {"size": self._format_font_size(10), "family": "\\rmfamily"},
             "article_title": {"size": self._format_font_size(16), "family": "\\rmfamily"},
@@ -205,6 +206,15 @@ class LatexJournalBuilder:
         self.lengths[name.strip().lstrip("\\")] = value.strip()
         return self
 
+    def set_background_image(self, path_to_image: str) -> "LatexJournalBuilder":
+        image_path = Path(path_to_image).resolve()
+        if image_path.exists():
+            self.background_image_path = str(image_path).replace("\\", "/")
+        else:
+            self.background_image_path = None
+            print(f"Background image not found, skipping: {image_path}")
+        return self
+
     def set_body_font(self, size: int | float, family: str) -> "LatexJournalBuilder":
         self.fonts["body"] = {
             "size": self._format_font_size(size),
@@ -356,9 +366,24 @@ class LatexJournalBuilder:
         body = "\n".join(body_parts)
         body = body.replace("\\begin{multicols}{2}\n\\end{multicols}\n", "")
         body = body.replace("\\begin{multicols}{2}\n\\end{multicols}", "")
+        background_setup = ""
+        background_apply = ""
+        if self.background_image_path:
+            background_setup = (
+                "\\usepackage{eso-pic}\n"
+                "\\newcommand{\\JournalBackground}{%\n"
+                "  \\put(0,0){\\parbox[b][\\paperheight]{\\paperwidth}{%\n"
+                "    \\vfill\\centering\n"
+                f"    \\includegraphics[width=\\paperwidth,height=\\paperheight]{{{self.background_image_path}}}%\n"
+                "    \\vfill\n"
+                "  }}\n"
+                "}\n"
+            )
+            background_apply = "\\AddToShipoutPictureBG{\\JournalBackground}\n"
         return (
             f"\\documentclass{options}{{{self.document_class}}}\n\n"
             f"{packages}\n\n"
+            f"{background_setup}"
             f"{lengths}\n"
             f"\\pagestyle{{{self.page_style}}}\n\n"
             f"\\newcommand{{\\BodyTextFont}}{{{self.fonts['body']['size']} {self.fonts['body']['family']}}}\n"
@@ -369,6 +394,7 @@ class LatexJournalBuilder:
             "\\newlength{\\JournalOneColWidth}\n"
             "\\setlength{\\JournalOneColWidth}{\\dimexpr(\\textwidth-\\columnsep)/2\\relax}\n\n"
             "\\begin{document}\n\n"
+            f"{background_apply}"
             f"\\noindent{{\\IssueInfoFont\\textit{{{self.issue_info}}}}}\n\n"
             "\\begin{center}\n"
             f"    {{\\ArticleTitleFont\\bfseries {self.article_name}}}\n"
