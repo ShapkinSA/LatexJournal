@@ -318,7 +318,11 @@ class LatexJournalBuilder:
         return self
 
     def add_paragraph(self, text: str) -> "LatexJournalBuilder":
-        self.blocks.append(("normal", f"{{\\BodyTextFont {self._escape_latex(text)}}}"))
+        escaped = self._escape_latex(text).strip()
+        # Always enforce first-line indentation, including after image blocks.
+        self.blocks.append(
+            ("normal", f"\\par{{\\BodyTextFont\\hspace*{{\\parindent}}{escaped}}}\\par")
+        )
         return self
 
     def add_picture(
@@ -338,7 +342,6 @@ class LatexJournalBuilder:
         caption_block = ""
         if escaped_caption:
             caption_block = (
-                "\\par\\vspace{0.15em}\n"
                 f"{{\\CaptionFont {escaped_caption}}}\n"
             )
         width = width.strip()
@@ -370,28 +373,28 @@ class LatexJournalBuilder:
             )
         elif is_wide:
             wide_block = (
-                "\\par\\begin{samepage}\n"
-                "\\noindent\\begin{center}\n"
+                "\\begin{samepage}\n"
+                "\\noindent\\makebox[\\textwidth][c]{%\n"
                 f"\\begin{{minipage}}{{{width_for_use}}}\n"
                 "\\centering\n"
                 f"\\includegraphics{opts}{{{latex_path}}}\n"
                 f"{caption_block}"
                 "\\end{minipage}\n"
-                "\\end{center}\n"
-                "\\end{samepage}\\par"
+                "}\n"
+                "\\end{samepage}"
             )
             self.blocks.append(("wide", wide_block))
         else:
             normal_block = (
-                "\\par\\begin{samepage}\n"
-                "\\noindent\\begin{center}\n"
+                "\\begin{samepage}\n"
+                "\\noindent\\makebox[\\linewidth][c]{%\n"
                 f"\\begin{{minipage}}{{{width_for_use}}}\n"
                 "\\centering\n"
                 f"\\includegraphics{opts}{{{latex_path}}}\n"
                 f"{caption_block}"
                 "\\end{minipage}\n"
-                "\\end{center}\n"
-                "\\end{samepage}\\par"
+                "}\n"
+                "\\end{samepage}"
             )
             self.blocks.append(("normal", normal_block))
         return self
@@ -442,6 +445,10 @@ class LatexJournalBuilder:
         body = "\n".join(body_parts)
         body = body.replace("\\begin{multicols}{2}\n\\end{multicols}\n", "")
         body = body.replace("\\begin{multicols}{2}\n\\end{multicols}", "")
+        if body.startswith("\\par\n"):
+            body = body[len("\\par\n") :]
+        elif body.startswith("\\par"):
+            body = body[len("\\par") :]
         background_setup = ""
         background_apply = ""
         if self.background_image_path:
@@ -483,9 +490,10 @@ class LatexJournalBuilder:
             "\\begin{document}\n\n"
             f"{background_apply}"
             f"\\noindent{{\\IssueInfoFont\\textit{{{self.issue_info}}}}}\n\n"
-            "\\begin{center}\n"
-            f"    {{\\ArticleTitleFont\\bfseries {self.article_name}}}\n"
-            "\\end{center}\n"
+            "\\vspace{\\baselineskip}\n"
+            "{\\centering\n"
+            f"{{\\ArticleTitleFont\\bfseries {self.article_name}}}\\par\n"
+            "}\n"
             f"{body}\n"
             "\\end{document}\n"
         )
