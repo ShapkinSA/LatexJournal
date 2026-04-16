@@ -1,0 +1,43 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{cmap}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+
+\usepackage{paratype}
+\usepackage{graphicx}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{setspace}
+\usepackage{xcolor}
+\usepackage{ragged2e}
+\usepackage{microtype}
+\microtypesetup{expansion=false}
+
+\onehalfspacing
+\pagestyle{empty}
+
+% Цвета
+\definecolor{textgray}{RGB}{43,27,18}
+\definecolor{dategray}{RGB}{90,65,45}
+\definecolor{textbrown}{RGB}{43,27,18}
+\definecolor{datebrown}{RGB}{90,65,45}
+
+% Абзацы
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0.35em}
+
+\newcommand{\entrydate}[1]{%
+    {\large\bfseries\color{dategray} #1}\par
+    \vspace{1.2em}
+}
+
+\newenvironment{speech}
+    {\begin{list}{}{\leftmargin=1.5cm \rightmargin=0.5cm}
+     \item\relax\itshape}
+    {\end{list}}
+
+\begin{document}
+
+\color{textgray}
+\justifying

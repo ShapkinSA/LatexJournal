@@ -6,9 +6,15 @@ import unicodedata
 from pathlib import Path
 from typing import List, Tuple
 
+_DEFAULT_JOURNAL_TEMPLATE = (
+    Path(__file__).resolve().parent.parent / "templates" / "latex_journal_template" / "template.tex"
+)
+
 
 class LatexJournalBuilder:
-    def __init__(self, template_path: str | Path = "template/template.tex") -> None:
+    def __init__(self, template_path: str | Path | None = None) -> None:
+        if template_path is None:
+            template_path = _DEFAULT_JOURNAL_TEMPLATE
         self.article_name: str = "Без названия"
         self.issue_info: str = "Выпуск без даты"
         self.blocks: List[Tuple[str, str]] = []
